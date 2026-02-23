@@ -76,30 +76,56 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   // Proxy SharePoint fetch requests from the side panel.
-  // The service worker does NOT share the browser's cookie jar, so we must
-  // manually read SharePoint cookies via chrome.cookies API and attach them.
   if (message.type === 'SP_FETCH') {
     (async () => {
       try {
         const { url, options } = message;
 
-        // Read SharePoint session cookies from the browser's cookie jar
-        const cookies = await chrome.cookies.getAll({ domain: 'gbtravel.sharepoint.com' });
-        const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+        // Diagnostic: check what cookies the browser has for SharePoint
+        const spCookies = await chrome.cookies.getAll({ url: 'https://gbtravel.sharepoint.com' });
+        console.log('[SP_FETCH]', options.method || 'GET', url);
+        console.log('[SP_FETCH] Browser cookies for SP:', spCookies.length,
+          '| Names:', spCookies.map(c => c.name).join(', '),
+          '| Domains:', [...new Set(spCookies.map(c => c.domain))].join(', '));
+
+        // Build cookie header from browser's cookie jar
+        const cookieStr = spCookies.map(c => `${c.name}=${c.value}`).join('; ');
 
         const fetchOptions = {
           method: options.method || 'GET',
-          credentials: 'omit',
-          headers: options.headers || {}
+          headers: { ...options.headers }
         };
-        if (cookieHeader) {
-          fetchOptions.headers['Cookie'] = cookieHeader;
-        }
         if (options.body) {
           fetchOptions.body = options.body;
         }
 
-        const response = await fetch(url, fetchOptions);
+        // Strategy: use credentials:'omit' and manually attach cookies.
+        // In MV3 service workers, credentials:'include' uses the SW's own
+        // cookie jar (which is empty). The chrome.cookies API reads the
+        // BROWSER's cookies, which is what we need.
+        fetchOptions.credentials = 'omit';
+        if (cookieStr) {
+          fetchOptions.headers['Cookie'] = cookieStr;
+        }
+
+        let response = await fetch(url, fetchOptions);
+        console.log('[SP_FETCH] Response (manual cookies):', response.status, response.statusText);
+
+        // If manual cookies didn't work (403/401), try credentials:'include'
+        // as fallback — in case this Chrome version DOES share the cookie jar
+        if (response.status === 401 || response.status === 403) {
+          console.log('[SP_FETCH] Manual cookies failed, trying credentials:include...');
+          const fallbackOptions = {
+            method: options.method || 'GET',
+            credentials: 'include',
+            headers: { ...options.headers }
+          };
+          if (options.body) {
+            fallbackOptions.body = options.body;
+          }
+          response = await fetch(url, fallbackOptions);
+          console.log('[SP_FETCH] Response (credentials:include):', response.status, response.statusText);
+        }
 
         // Read the response body
         let data = null;
