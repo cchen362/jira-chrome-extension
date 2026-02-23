@@ -52,19 +52,16 @@ chrome.action.onClicked.addListener((tab) => {
 
 // --- Message Relay ---
 
-// Relay messages between side panel and content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Relay Jira data requests to the content script
   if (message.type === 'GET_JIRA_DATA') {
-    // Side panel is requesting Jira data — forward to content script in active tab
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (!tabs[0]?.id) {
         sendResponse({ success: false, error: 'No active tab found.' });
         return;
       }
 
-      const tabId = tabs[0].id;
-
-      chrome.tabs.sendMessage(tabId, { type: 'EXTRACT_JIRA_DATA' }, (response) => {
+      chrome.tabs.sendMessage(tabs[0].id, { type: 'EXTRACT_JIRA_DATA' }, (response) => {
         if (chrome.runtime.lastError) {
           sendResponse({
             success: false,
@@ -75,8 +72,50 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse(response);
       });
     });
+    return true;
+  }
 
-    // Return true to indicate we will respond asynchronously
+  // Proxy SharePoint fetch requests from the side panel.
+  // The background service worker has host_permissions for gbtravel.sharepoint.com,
+  // so fetch() here includes the user's SharePoint session cookies automatically.
+  // The side panel's chrome-extension:// origin cannot send these cookies directly.
+  if (message.type === 'SP_FETCH') {
+    (async () => {
+      try {
+        const { url, options } = message;
+        const fetchOptions = {
+          method: options.method || 'GET',
+          credentials: 'include',
+          headers: options.headers || {}
+        };
+        if (options.body) {
+          fetchOptions.body = options.body;
+        }
+
+        const response = await fetch(url, fetchOptions);
+
+        // Read the response body
+        let data = null;
+        let bodyText = '';
+        const contentType = response.headers.get('Content-Type') || '';
+
+        if (contentType.includes('application/json')) {
+          data = await response.json();
+        } else {
+          bodyText = await response.text();
+        }
+
+        sendResponse({
+          ok: response.ok,
+          status: response.status,
+          statusText: response.statusText,
+          data,
+          bodyText
+        });
+      } catch (e) {
+        sendResponse({ error: e.message });
+      }
+    })();
     return true;
   }
 });

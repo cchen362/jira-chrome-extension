@@ -1,5 +1,6 @@
 // sharepoint.js — SharePoint REST API module
-// Handles form digest, CRUD operations, and duplicate detection for JiraTicketLog list.
+// All fetch calls are routed through the background service worker
+// (which has host_permissions and access to SharePoint session cookies).
 
 const SharePoint = (() => {
   const SITE_URL = 'https://gbtravel.sharepoint.com/sites/GlobalEfficiencyTeam';
@@ -11,8 +12,35 @@ const SharePoint = (() => {
   const DIGEST_TTL_MS = 25 * 60 * 1000; // 25 minutes (expires at 30)
 
   /**
+   * Send a fetch request through the background service worker.
+   * The background has host_permissions for gbtravel.sharepoint.com,
+   * so it can send cookies that the side panel origin cannot.
+   */
+  function bgFetch(url, options) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        { type: 'SP_FETCH', url, options },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          if (!response) {
+            reject(new Error('No response from background worker.'));
+            return;
+          }
+          if (response.error) {
+            reject(new Error(response.error));
+            return;
+          }
+          resolve(response);
+        }
+      );
+    });
+  }
+
+  /**
    * Get a valid form digest for write operations.
-   * Caches the digest and refreshes when expired.
    */
   async function getFormDigest() {
     const now = Date.now();
@@ -20,54 +48,43 @@ const SharePoint = (() => {
       return digestCache.value;
     }
 
-    const response = await fetch(`${SITE_URL}/_api/contextinfo`, {
+    const result = await bgFetch(`${SITE_URL}/_api/contextinfo`, {
       method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Accept': 'application/json;odata=verbose'
-      }
+      headers: { 'Accept': 'application/json;odata=verbose' }
     });
 
-    if (!response.ok) {
-      if (response.status === 401 || response.status === 403) {
+    if (!result.ok) {
+      if (result.status === 401 || result.status === 403) {
         throw new Error('Not authenticated to SharePoint. Open SharePoint in another tab, log in, then try again.');
       }
-      throw new Error(`Failed to get form digest: ${response.status} ${response.statusText}`);
+      throw new Error(`Failed to get form digest: ${result.status} ${result.statusText}`);
     }
 
-    const data = await response.json();
-    digestCache.value = data.d.GetContextWebInformation.FormDigestValue;
+    digestCache.value = result.data.d.GetContextWebInformation.FormDigestValue;
     digestCache.timestamp = now;
     return digestCache.value;
   }
 
   /**
    * Query SharePoint for an existing item with the given ticket number.
-   * @param {string} ticketNumber - e.g., "EGEGOET-3299"
-   * @returns {Object} { exists: boolean, item?: Object, id?: number, etag?: string }
    */
   async function findByTicketNumber(ticketNumber) {
     const filter = encodeURIComponent(`TicketNumber eq '${ticketNumber}'`);
     const url = `${SITE_URL}/_api/web/lists/getbytitle('${LIST_NAME}')/items?$filter=${filter}&$top=1`;
 
-    const response = await fetch(url, {
+    const result = await bgFetch(url, {
       method: 'GET',
-      credentials: 'include',
-      headers: {
-        'Accept': 'application/json;odata=verbose'
-      }
+      headers: { 'Accept': 'application/json;odata=verbose' }
     });
 
-    if (!response.ok) {
-      if (response.status === 401 || response.status === 403) {
+    if (!result.ok) {
+      if (result.status === 401 || result.status === 403) {
         throw new Error('Not authenticated to SharePoint. Open SharePoint in another tab, log in, then try again.');
       }
-      throw new Error(`Failed to query SharePoint: ${response.status} ${response.statusText}`);
+      throw new Error(`Failed to query SharePoint: ${result.status} ${result.statusText}`);
     }
 
-    const data = await response.json();
-    const results = data.d.results;
-
+    const results = result.data.d.results;
     if (results.length === 0) {
       return { exists: false };
     }
@@ -83,8 +100,6 @@ const SharePoint = (() => {
 
   /**
    * Create a new item in the SharePoint list.
-   * @param {Object} fieldData - Column name → value pairs (use internal names)
-   * @returns {Object} The created item
    */
   async function createItem(fieldData) {
     const digest = await getFormDigest();
@@ -95,9 +110,8 @@ const SharePoint = (() => {
       ...fieldData
     };
 
-    const response = await fetch(url, {
+    const result = await bgFetch(url, {
       method: 'POST',
-      credentials: 'include',
       headers: {
         'Accept': 'application/json;odata=verbose',
         'Content-Type': 'application/json;odata=verbose',
@@ -106,23 +120,18 @@ const SharePoint = (() => {
       body: JSON.stringify(body)
     });
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => '');
-      if (response.status === 401 || response.status === 403) {
+    if (!result.ok) {
+      if (result.status === 401 || result.status === 403) {
         throw new Error('Not authenticated to SharePoint. Open SharePoint in another tab, log in, then try again.');
       }
-      throw new Error(`Failed to create item: ${response.status} ${response.statusText}. ${errorText}`);
+      throw new Error(`Failed to create item: ${result.status} ${result.statusText}. ${result.bodyText || ''}`);
     }
 
-    return (await response.json()).d;
+    return result.data;
   }
 
   /**
    * Update an existing item in the SharePoint list.
-   * @param {number} itemId - The SharePoint item ID
-   * @param {Object} fieldData - Column name → value pairs to update
-   * @param {string} etag - The item's etag for concurrency control
-   * @returns {void}
    */
   async function updateItem(itemId, fieldData, etag) {
     const digest = await getFormDigest();
@@ -133,9 +142,8 @@ const SharePoint = (() => {
       ...fieldData
     };
 
-    const response = await fetch(url, {
+    const result = await bgFetch(url, {
       method: 'POST',
-      credentials: 'include',
       headers: {
         'Accept': 'application/json;odata=verbose',
         'Content-Type': 'application/json;odata=verbose',
@@ -146,15 +154,14 @@ const SharePoint = (() => {
       body: JSON.stringify(body)
     });
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => '');
-      if (response.status === 401 || response.status === 403) {
+    if (!result.ok) {
+      if (result.status === 401 || result.status === 403) {
         throw new Error('Not authenticated to SharePoint. Open SharePoint in another tab, log in, then try again.');
       }
-      if (response.status === 412) {
+      if (result.status === 412) {
         throw new Error('This item was modified by someone else. Please refresh and try again.');
       }
-      throw new Error(`Failed to update item: ${response.status} ${response.statusText}. ${errorText}`);
+      throw new Error(`Failed to update item: ${result.status} ${result.statusText}. ${result.bodyText || ''}`);
     }
   }
 
