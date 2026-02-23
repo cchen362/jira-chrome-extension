@@ -77,13 +77,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // Proxy SharePoint fetch requests from the side panel.
   // credentials:'include' sends the browser's cookies for domains in host_permissions.
-  // For POST requests, SharePoint's CSRF protection checks the Origin header —
-  // we must set it to the SP site URL so the request isn't rejected.
+  // The Origin header is rewritten to the SP domain via declarativeNetRequest rules
+  // (sp_header_rules.json) so SharePoint's CSRF protection accepts POSTs.
   if (message.type === 'SP_FETCH') {
     (async () => {
       try {
         const { url, options } = message;
-        const SP_ORIGIN = 'https://gbtravel.sharepoint.com';
 
         const fetchOptions = {
           method: options.method || 'GET',
@@ -92,14 +91,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         };
         if (options.body) {
           fetchOptions.body = options.body;
-        }
-
-        // SharePoint rejects POSTs from unrecognized origins (CSRF protection).
-        // Set Origin + Referer to the SP site so the request appears first-party.
-        // Chrome extensions with host_permissions can set these headers.
-        if (fetchOptions.method !== 'GET') {
-          fetchOptions.headers['Origin'] = SP_ORIGIN;
-          fetchOptions.headers['Referer'] = SP_ORIGIN + '/';
         }
 
         console.log('[SP_FETCH]', fetchOptions.method, url);
