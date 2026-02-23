@@ -3,7 +3,7 @@
   "name": "Jira Ticket Logger",
   "version": "1.0.0",
   "description": "Log Jira tickets to SharePoint with auto-extracted data and priority calculation.",
-  "permissions": ["sidePanel", "activeTab", "tabs"],
+  "permissions": ["sidePanel", "activeTab", "tabs", "cookies"],
   "host_permissions": [
     "https://jira.amexgbt.com/*",
     "https://gbtravel.sharepoint.com/*"

@@ -166,20 +166,29 @@ function extractDescription() {
 }
 
 function extractCreatedDate() {
-  // IMPORTANT: Always use the visible text content, NOT the datetime attribute.
-  // The datetime attr is UTC and causes timezone-shift bugs (e.g., 24/Nov → 25/Nov).
+  // Hybrid approach:
+  // 1. Try visible text first (avoids UTC timezone-shift bugs on absolute dates)
+  // 2. If visible text is a relative date ("3 days ago"), fall back to datetime attribute
+  //    but parse it WITHOUT new Date() to avoid timezone conversion
   return tryStrategies(
-    // Primary: time element's visible text
+    // Primary: time element — check visible text, fall back to datetime attr for relative dates
     () => {
       const el = document.querySelector('#created-val time, #create-date time');
       if (!el) return null;
-      return stripTime(el.textContent);
+      const visibleText = stripTime(el.textContent);
+      if (visibleText && !isRelativeDate(visibleText)) return visibleText;
+      // Relative date detected — use datetime attribute, parsed safely
+      return dateFromAttr(el.getAttribute('datetime'));
     },
-    // Fallback: #created-val text directly
+    // Fallback: #created-val text with same hybrid logic
     () => {
       const el = document.getElementById('created-val');
       if (!el) return null;
-      return stripTime(el.textContent);
+      const time = el.querySelector('time');
+      const visibleText = stripTime(time ? time.textContent : el.textContent);
+      if (visibleText && !isRelativeDate(visibleText)) return visibleText;
+      if (time) return dateFromAttr(time.getAttribute('datetime'));
+      return null;
     },
     // Fallback: Dates section label search
     () => {
@@ -191,13 +200,22 @@ function extractCreatedDate() {
           const val = item.nextElementSibling || item.parentElement?.nextElementSibling;
           if (val) {
             const time = val.querySelector('time');
-            return stripTime(time ? time.textContent : val.textContent);
+            if (time) {
+              const visibleText = stripTime(time.textContent);
+              if (visibleText && !isRelativeDate(visibleText)) return visibleText;
+              return dateFromAttr(time.getAttribute('datetime'));
+            }
+            return stripTime(val.textContent);
           }
         }
       }
       return null;
     },
-    () => stripTime(findByLabel('Created'))
+    () => {
+      const val = findByLabel('Created');
+      if (val && !isRelativeDate(val)) return stripTime(val);
+      return null;
+    }
   );
 }
 
@@ -211,6 +229,34 @@ function stripTime(dateStr) {
   // Remove time portion (everything after the date)
   const stripped = dateStr.trim().replace(/\s+\d{1,2}:\d{2}\s*(AM|PM|am|pm)?.*$/, '');
   return stripped || dateStr.trim();
+}
+
+/**
+ * Check if a string is a relative date like "3 days ago", "yesterday", "last week", etc.
+ */
+function isRelativeDate(str) {
+  if (!str) return false;
+  const lower = str.toLowerCase().trim();
+  return /^(today|yesterday|last\s|(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+ago)/.test(lower);
+}
+
+/**
+ * Extract a date string from a datetime attribute (ISO 8601).
+ * Parses the date components directly to avoid timezone conversion bugs.
+ * Input:  "2026-02-20T08:33:00+0000" or "2026-02-20T08:33:00.000+0530"
+ * Output: "20/Feb/26"
+ */
+function dateFromAttr(datetimeAttr) {
+  if (!datetimeAttr) return null;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  // Match the date portion before the T — this is the LOCAL date Jira intended
+  const match = datetimeAttr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  const year = match[1].slice(2); // "2026" → "26"
+  const monthIdx = parseInt(match[2], 10) - 1;
+  const day = parseInt(match[3], 10);
+  if (monthIdx < 0 || monthIdx > 11) return null;
+  return `${day}/${months[monthIdx]}/${year}`;
 }
 
 function extractComponents() {

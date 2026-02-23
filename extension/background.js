@@ -76,18 +76,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   // Proxy SharePoint fetch requests from the side panel.
-  // The background service worker has host_permissions for gbtravel.sharepoint.com,
-  // so fetch() here includes the user's SharePoint session cookies automatically.
-  // The side panel's chrome-extension:// origin cannot send these cookies directly.
+  // The service worker does NOT share the browser's cookie jar, so we must
+  // manually read SharePoint cookies via chrome.cookies API and attach them.
   if (message.type === 'SP_FETCH') {
     (async () => {
       try {
         const { url, options } = message;
+
+        // Read SharePoint session cookies from the browser's cookie jar
+        const cookies = await chrome.cookies.getAll({ domain: 'gbtravel.sharepoint.com' });
+        const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+
         const fetchOptions = {
           method: options.method || 'GET',
-          credentials: 'include',
+          credentials: 'omit',
           headers: options.headers || {}
         };
+        if (cookieHeader) {
+          fetchOptions.headers['Cookie'] = cookieHeader;
+        }
         if (options.body) {
           fetchOptions.body = options.body;
         }

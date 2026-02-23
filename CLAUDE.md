@@ -11,7 +11,7 @@ Chrome Extension (Manifest V3) with side panel UI. Auto-extracts Jira ticket dat
 - **Site URL:** `https://gbtravel.sharepoint.com/sites/GlobalEfficiencyTeam`
 - **List Name:** `JiraTicketLog`
 - **Entity Type:** `SP.Data.JiraTicketLogListItem`
-- **Auth:** Session-based (`credentials: 'include'`), piggybacks on browser SharePoint login
+- **Auth:** Session-based via `chrome.cookies` API — service worker reads SharePoint cookies and attaches them manually (see Lessons Learned)
 
 ### Jira
 - **Base URL:** `https://jira.amexgbt.com`
@@ -90,5 +90,6 @@ extension/
 - Test case 3 in implementation-plan.md was wrong: Effort=10 is Low (not Medium), result should be Accepted
 - Region field in Jira is customfield_17039, visible in Details section (not sidebar)
 - Side panel cannot use `credentials: 'include'` for SharePoint — cookies are domain-bound, must proxy through background service worker
+- **MV3 service worker `credentials: 'include'` does NOT send browser cookies.** Service workers have their own empty cookie jar. Must use `chrome.cookies.getAll()` to read cookies from the browser's jar and attach them manually as a `Cookie` header with `credentials: 'omit'`. Requires `"cookies"` permission in manifest.
 - Description selector: NEVER use `.closest('.module')` — it climbs to the entire Details section. Use `.closest('.toggle-wrap')` instead
-- Created Date: NEVER parse the `datetime` attribute (it's UTC and causes timezone shift). Always use visible text content
+- Created Date: Use a HYBRID approach — (1) try visible text first (avoids UTC timezone shift on absolute dates like "24/Nov/25"), (2) if visible text is a relative date ("3 days ago", "yesterday"), fall back to `datetime` attribute but parse date components directly (regex `^(\d{4})-(\d{2})-(\d{2})`) — NEVER use `new Date()` on the ISO string as it converts to local timezone and can shift the date

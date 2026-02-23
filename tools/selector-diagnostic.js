@@ -92,19 +92,38 @@
     () => document.getElementById('description-val')?.textContent
   ));
 
-  // 5. Created Date — use visible text, NOT datetime attr (UTC causes timezone shift)
+  // 5. Created Date — hybrid: use visible text for absolute dates, datetime attr for relative dates
   function stripTime(s) {
     if (!s) return null;
     return s.trim().replace(/\s+\d{1,2}:\d{2}\s*(AM|PM|am|pm)?.*$/i, '').trim() || s.trim();
   }
+  function isRelativeDate(s) {
+    if (!s) return false;
+    return /^(today|yesterday|last\s|(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+ago)/i.test(s.trim());
+  }
+  function dateFromAttr(attr) {
+    if (!attr) return null;
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const m = attr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return null;
+    return `${parseInt(m[3],10)}/${months[parseInt(m[2],10)-1]}/${m[1].slice(2)}`;
+  }
   fields.push(test('Created Date',
     () => {
       const el = document.querySelector('#created-val time, #create-date time');
-      return el ? stripTime(el.textContent) : null;
+      if (!el) return null;
+      const text = stripTime(el.textContent);
+      if (text && !isRelativeDate(text)) return text;
+      return dateFromAttr(el.getAttribute('datetime'));
     },
     () => {
       const el = document.getElementById('created-val');
-      return el ? stripTime(el.textContent) : null;
+      if (!el) return null;
+      const time = el.querySelector('time');
+      const text = stripTime(time ? time.textContent : el.textContent);
+      if (text && !isRelativeDate(text)) return text;
+      if (time) return dateFromAttr(time.getAttribute('datetime'));
+      return null;
     },
     () => {
       const labels = document.querySelectorAll('strong, label, .wrap .name, dt');
@@ -112,7 +131,12 @@
         if (el.textContent.trim().replace(':', '') === 'Created') {
           const val = el.nextElementSibling || el.parentElement?.nextElementSibling;
           const time = val?.querySelector('time');
-          return stripTime(time ? time.textContent : val?.textContent);
+          if (time) {
+            const text = stripTime(time.textContent);
+            if (text && !isRelativeDate(text)) return text;
+            return dateFromAttr(time.getAttribute('datetime'));
+          }
+          return stripTime(val?.textContent);
         }
       }
       return null;
