@@ -79,9 +79,16 @@ extension/
 - [ ] Phase 2: Hardening & Polish
 - [ ] Phase 3: Rollout
 
+## Architecture Notes
+- **SharePoint calls MUST go through background.js** — side panel runs in chrome-extension:// origin and cannot send SharePoint session cookies. background.js has host_permissions and proxies all SP fetch calls via the `SP_FETCH` message type.
+- **Content script ↔ Side panel** communication is also relayed through background.js via `GET_JIRA_DATA` / `EXTRACT_JIRA_DATA` messages.
+
 ## Lessons Learned
 <!-- Update this section as we discover things during development -->
 - SharePoint internal column names matched display names exactly — no encoding surprises
 - Jira Description is a collapsible section (aui-toggle-header-button-label), not a standard field
 - Test case 3 in implementation-plan.md was wrong: Effort=10 is Low (not Medium), result should be Accepted
 - Region field in Jira is customfield_17039, visible in Details section (not sidebar)
+- Side panel cannot use `credentials: 'include'` for SharePoint — cookies are domain-bound, must proxy through background service worker
+- Description selector: NEVER use `.closest('.module')` — it climbs to the entire Details section. Use `.closest('.toggle-wrap')` instead
+- Created Date: NEVER parse the `datetime` attribute (it's UTC and causes timezone shift). Always use visible text content
