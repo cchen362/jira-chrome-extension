@@ -29,7 +29,7 @@ Description        Note       — plain text
 Reporter           Text
 Assignee           Text
 CreatedDate        Text       — date string only (e.g., "24/Nov/25")
-Region             Choice     — APAC, EMEA, NA, Global
+Region             Choice     — APAC, EMEA, NA, Global, EMEA and APAC
 TicketStatus       Choice     — New, In Progress, Hold, Complete, RTB Submitted, RTB Completed
 OverallSavings     Choice     — <$50K, $50-$100K, >$100K
 ImpactedArea       Choice     — POS, Single Region, >1 Region
@@ -76,7 +76,7 @@ extension/
 ## Phase Tracker
 - [x] Phase 0: Auth POC — validated session auth + cross-origin
 - [x] Phase 1: Core MVP — COMPLETE (2026-02-23)
-- [ ] Phase 2: Hardening & Polish
+- [x] Phase 2: Hardening & Polish — COMPLETE (2026-02-24)
 - [ ] Phase 3: Rollout
 
 ## Architecture Notes
@@ -97,3 +97,5 @@ extension/
 - `cookies` permission still useful for diagnostics but not needed for the actual auth flow.
 - Description selector: NEVER use `.closest('.module')` — it climbs to the entire Details section. Use `.closest('.toggle-wrap')` instead
 - Created Date: Use a HYBRID approach — (1) try visible text first (avoids UTC timezone shift on absolute dates like "24/Nov/25"), (2) if visible text is a relative date ("3 days ago", "yesterday"), fall back to `datetime` attribute but parse date components directly (regex `^(\d{4})-(\d{2})-(\d{2})`) — NEVER use `new Date()` on the ISO string as it converts to local timezone and can shift the date
+- Phase 2: SharePoint retry uses `withRetry(fn, 2)` wrapper — only retries on transient errors (network, 500, 503, 429), NOT on auth (401/403) or conflict (412). On 403 during POST, invalidate digest cache so next retry gets a fresh one.
+- Phase 2: Region dropdown has 5 options: APAC, EMEA, NA, Global, EMEA and APAC (added 2026-02-24)

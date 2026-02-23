@@ -49,6 +49,21 @@
     notes: 'field-notes'
   };
 
+  const FIELD_LABELS = {
+    reporter: 'Reporter',
+    assignee: 'Assignee',
+    description: 'Description',
+    createdDate: 'Created Date',
+    overallSavings: 'Overall Savings',
+    impactedArea: 'Impacted Area',
+    impactedAudience: 'Impacted Audience',
+    duration: 'Duration',
+    stakeholder: 'Stakeholder',
+    investmentTime: 'Investment Time',
+    riskItems: 'Risk/Watch Items',
+    status: 'Status'
+  };
+
   // --- View Management ---
 
   function showView(viewId) {
@@ -241,7 +256,7 @@
     const commonRequired = ['reporter', 'assignee', 'description', 'createdDate'];
     for (const name of commonRequired) {
       if (!getField(name).value.trim()) {
-        showFieldError(name, 'This field is required.');
+        showFieldError(name, `${FIELD_LABELS[name]} is required.`);
         valid = false;
       }
     }
@@ -251,13 +266,13 @@
       const scoringFields = ['overallSavings', 'impactedArea', 'impactedAudience', 'duration', 'stakeholder', 'investmentTime'];
       for (const name of scoringFields) {
         if (!getField(name).value) {
-          showFieldError(name, 'Please select an option.');
+          showFieldError(name, `Please select ${FIELD_LABELS[name].toLowerCase()}.`);
           valid = false;
         }
       }
       // Risk/Watch Items required
       if (!getField('riskItems').value.trim()) {
-        showFieldError('riskItems', 'This field is required.');
+        showFieldError('riskItems', `${FIELD_LABELS['riskItems']} is required.`);
         valid = false;
       }
     } else {
@@ -419,17 +434,17 @@
   }
 
   function assembleSharePointData() {
-    const ticketNumber = getField('ticketNumber').value;
+    const ticketNumber = getField('ticketNumber').value.trim();
     const data = {
       Title: ticketNumber,
       TicketNumber: ticketNumber,
       TicketType: state.ticketType === 'product' ? 'Product' : 'Salesforce',
-      Description: getField('description').value,
-      Reporter: getField('reporter').value,
-      Assignee: getField('assignee').value,
-      CreatedDate: getField('createdDate').value,
-      SubmittedBy: getField('assignee').value,
-      Notes: getField('notes').value || null
+      Description: getField('description').value.trim(),
+      Reporter: getField('reporter').value.trim(),
+      Assignee: getField('assignee').value.trim(),
+      CreatedDate: getField('createdDate').value.trim(),
+      SubmittedBy: getField('assignee').value.trim(),
+      Notes: getField('notes').value.trim() || null
     };
 
     if (state.ticketType === 'product') {
@@ -439,8 +454,8 @@
       data.Duration = getField('duration').value;
       data.Stakeholder = getField('stakeholder').value;
       data.InvestmentTime = getField('investmentTime').value;
-      data.TargetCompleteDate = getField('targetDate').value || null;
-      data.RiskWatchItems = getField('riskItems').value;
+      data.TargetCompleteDate = getField('targetDate').value.trim() || null;
+      data.RiskWatchItems = getField('riskItems').value.trim();
 
       // Calculate and store the rating
       const result = Calculator.calculateRating({
@@ -467,6 +482,27 @@
     div.textContent = str;
     return div.innerHTML;
   }
+
+  // --- Clear field errors on interaction ---
+
+  function setupFieldErrorClearListeners() {
+    const form = document.getElementById('ticket-form');
+    function clearFieldError(e) {
+      const group = e.target.closest('.form-group');
+      if (group && group.classList.contains('has-error')) {
+        group.classList.remove('has-error');
+        const err = group.querySelector('.error-text');
+        if (err) {
+          err.textContent = '';
+          err.classList.add('hidden');
+        }
+      }
+    }
+    form.addEventListener('input', clearFieldError);
+    form.addEventListener('change', clearFieldError);
+  }
+
+  setupFieldErrorClearListeners();
 
   // --- Event Listeners ---
 

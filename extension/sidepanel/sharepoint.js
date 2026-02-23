@@ -40,6 +40,34 @@ const SharePoint = (() => {
   }
 
   /**
+   * Retry wrapper for transient failures.
+   * Retries up to maxRetries times with a 1-second delay.
+   * Only retries on network errors, 500, 503, 429.
+   */
+  async function withRetry(fn, maxRetries = 2) {
+    let lastError;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (e) {
+        lastError = e;
+        const msg = e.message || '';
+        const isTransient = msg.includes('Failed to fetch') ||
+                            msg.includes('NetworkError') ||
+                            msg.includes('net::') ||
+                            msg.includes(': 500 ') ||
+                            msg.includes(': 503 ') ||
+                            msg.includes(': 429 ');
+        if (!isTransient || attempt === maxRetries) {
+          throw e;
+        }
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
+    throw lastError;
+  }
+
+  /**
    * Get a valid form digest for write operations.
    */
   async function getFormDigest() {
@@ -66,103 +94,123 @@ const SharePoint = (() => {
   }
 
   /**
+   * Force-clear the cached form digest (called when POST gets 403).
+   */
+  function invalidateDigest() {
+    digestCache.value = null;
+    digestCache.timestamp = 0;
+  }
+
+  /**
    * Query SharePoint for an existing item with the given ticket number.
    */
   async function findByTicketNumber(ticketNumber) {
-    const filter = encodeURIComponent(`TicketNumber eq '${ticketNumber}'`);
-    const url = `${SITE_URL}/_api/web/lists/getbytitle('${LIST_NAME}')/items?$filter=${filter}&$top=1`;
+    return withRetry(async () => {
+      const filter = encodeURIComponent(`TicketNumber eq '${ticketNumber}'`);
+      const url = `${SITE_URL}/_api/web/lists/getbytitle('${LIST_NAME}')/items?$filter=${filter}&$top=1`;
 
-    const result = await bgFetch(url, {
-      method: 'GET',
-      headers: { 'Accept': 'application/json;odata=verbose' }
-    });
+      const result = await bgFetch(url, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json;odata=verbose' }
+      });
 
-    if (!result.ok) {
-      if (result.status === 401 || result.status === 403) {
-        throw new Error('Not authenticated to SharePoint. Open SharePoint in another tab, log in, then try again.');
+      if (!result.ok) {
+        if (result.status === 401 || result.status === 403) {
+          throw new Error('Not authenticated to SharePoint. Open SharePoint in another tab, log in, then try again.');
+        }
+        throw new Error(`Failed to query SharePoint: ${result.status} ${result.statusText}`);
       }
-      throw new Error(`Failed to query SharePoint: ${result.status} ${result.statusText}`);
-    }
 
-    const results = result.data.d.results;
-    if (results.length === 0) {
-      return { exists: false };
-    }
+      const results = result.data.d.results;
+      if (results.length === 0) {
+        return { exists: false };
+      }
 
-    const item = results[0];
-    return {
-      exists: true,
-      item,
-      id: item.Id,
-      etag: item.__metadata.etag
-    };
+      const item = results[0];
+      return {
+        exists: true,
+        item,
+        id: item.Id,
+        etag: item.__metadata.etag
+      };
+    });
   }
 
   /**
    * Create a new item in the SharePoint list.
    */
   async function createItem(fieldData) {
-    const digest = await getFormDigest();
-    const url = `${SITE_URL}/_api/web/lists/getbytitle('${LIST_NAME}')/items`;
+    return withRetry(async () => {
+      const digest = await getFormDigest();
+      const url = `${SITE_URL}/_api/web/lists/getbytitle('${LIST_NAME}')/items`;
 
-    const body = {
-      __metadata: { type: ENTITY_TYPE },
-      ...fieldData
-    };
+      const body = {
+        __metadata: { type: ENTITY_TYPE },
+        ...fieldData
+      };
 
-    const result = await bgFetch(url, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json;odata=verbose',
-        'Content-Type': 'application/json;odata=verbose',
-        'X-RequestDigest': digest
-      },
-      body: JSON.stringify(body)
-    });
+      const result = await bgFetch(url, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json;odata=verbose',
+          'Content-Type': 'application/json;odata=verbose',
+          'X-RequestDigest': digest
+        },
+        body: JSON.stringify(body)
+      });
 
-    if (!result.ok) {
-      if (result.status === 401 || result.status === 403) {
-        throw new Error('Not authenticated to SharePoint. Open SharePoint in another tab, log in, then try again.');
+      if (!result.ok) {
+        if (result.status === 403) {
+          invalidateDigest();
+        }
+        if (result.status === 401 || result.status === 403) {
+          throw new Error('Not authenticated to SharePoint. Open SharePoint in another tab, log in, then try again.');
+        }
+        throw new Error(`Failed to create item: ${result.status} ${result.statusText}. ${result.bodyText || ''}`);
       }
-      throw new Error(`Failed to create item: ${result.status} ${result.statusText}. ${result.bodyText || ''}`);
-    }
 
-    return result.data;
+      return result.data;
+    });
   }
 
   /**
    * Update an existing item in the SharePoint list.
    */
   async function updateItem(itemId, fieldData, etag) {
-    const digest = await getFormDigest();
-    const url = `${SITE_URL}/_api/web/lists/getbytitle('${LIST_NAME}')/items(${itemId})`;
+    return withRetry(async () => {
+      const digest = await getFormDigest();
+      const url = `${SITE_URL}/_api/web/lists/getbytitle('${LIST_NAME}')/items(${itemId})`;
 
-    const body = {
-      __metadata: { type: ENTITY_TYPE },
-      ...fieldData
-    };
+      const body = {
+        __metadata: { type: ENTITY_TYPE },
+        ...fieldData
+      };
 
-    const result = await bgFetch(url, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json;odata=verbose',
-        'Content-Type': 'application/json;odata=verbose',
-        'X-RequestDigest': digest,
-        'X-HTTP-Method': 'MERGE',
-        'If-Match': etag
-      },
-      body: JSON.stringify(body)
+      const result = await bgFetch(url, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json;odata=verbose',
+          'Content-Type': 'application/json;odata=verbose',
+          'X-RequestDigest': digest,
+          'X-HTTP-Method': 'MERGE',
+          'If-Match': etag
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!result.ok) {
+        if (result.status === 403) {
+          invalidateDigest();
+        }
+        if (result.status === 401 || result.status === 403) {
+          throw new Error('Not authenticated to SharePoint. Open SharePoint in another tab, log in, then try again.');
+        }
+        if (result.status === 412) {
+          throw new Error('This item was modified by someone else. Please refresh and try again.');
+        }
+        throw new Error(`Failed to update item: ${result.status} ${result.statusText}. ${result.bodyText || ''}`);
+      }
     });
-
-    if (!result.ok) {
-      if (result.status === 401 || result.status === 403) {
-        throw new Error('Not authenticated to SharePoint. Open SharePoint in another tab, log in, then try again.');
-      }
-      if (result.status === 412) {
-        throw new Error('This item was modified by someone else. Please refresh and try again.');
-      }
-      throw new Error(`Failed to update item: ${result.status} ${result.statusText}. ${result.bodyText || ''}`);
-    }
   }
 
   // Public API
