@@ -112,25 +112,46 @@ function extractAssignee() {
 
 function extractDescription() {
   return tryStrategies(
-    // Primary: Collapsible description section (aui-toggle pattern)
+    // Primary: Find the Description heading and get the content block that follows it.
+    // The Description is a collapsible section separate from the Details block.
+    // IMPORTANT: Do NOT use .closest('.module') — that climbs to the entire Details section.
     () => {
-      // Find the Description toggle header
-      const toggleButtons = document.querySelectorAll('.aui-toggle-header-button-label, .toggle-title');
-      for (const btn of toggleButtons) {
-        if (btn.textContent.trim() === 'Description') {
-          // The content is typically in a sibling or parent's sibling container
-          const section = btn.closest('.module, .aui-toggle-header')?.parentElement;
-          if (section) {
-            const content = section.querySelector('.user-content-block, .mod-content, .field-ignore-highlight');
-            return content ? content.textContent : null;
+      // Look for all heading elements that say "Description"
+      const headings = document.querySelectorAll('h2, h3, .toggle-title, .aui-toggle-header-button-label');
+      for (const heading of headings) {
+        if (heading.textContent.trim() !== 'Description') continue;
+
+        // Walk up only to the nearest toggle-wrap, header, or heading container — NOT to .module
+        const container = heading.closest('.toggle-wrap, .aui-toggle-header, [id*="description"]');
+        if (container) {
+          // Look for the content block within or after this container
+          const content = container.querySelector('.user-content-block, .mod-content, .field-ignore-highlight');
+          if (content) return content.textContent;
+          // Try next sibling of the container
+          const next = container.nextElementSibling;
+          if (next) {
+            const nested = next.querySelector('.user-content-block, .mod-content, .field-ignore-highlight');
+            if (nested) return nested.textContent;
+            return next.textContent;
           }
+        }
+
+        // If no container, try siblings of the heading itself
+        let sibling = heading.parentElement?.nextElementSibling;
+        if (sibling) {
+          const content = sibling.querySelector('.user-content-block, .mod-content, .field-ignore-highlight');
+          if (content) return content.textContent;
         }
       }
       return null;
     },
-    // Fallback: Standard description selectors
+    // Fallback: Direct ID-based selectors
     () => {
       const el = document.querySelector('#description-val .user-content-block');
+      return el ? el.textContent : null;
+    },
+    () => {
+      const el = document.querySelector('#descriptionmodule .user-content-block');
       return el ? el.textContent : null;
     },
     () => {
@@ -145,25 +166,19 @@ function extractDescription() {
 }
 
 function extractCreatedDate() {
+  // IMPORTANT: Always use the visible text content, NOT the datetime attribute.
+  // The datetime attr is UTC and causes timezone-shift bugs (e.g., 24/Nov → 25/Nov).
   return tryStrategies(
-    // Primary: time element with datetime attribute
+    // Primary: time element's visible text
     () => {
       const el = document.querySelector('#created-val time, #create-date time');
       if (!el) return null;
-      // Try datetime attribute first (ISO format)
-      const dt = el.getAttribute('datetime');
-      if (dt) {
-        const date = new Date(dt);
-        if (!isNaN(date)) {
-          // Format as DD/Mon/YY to match Jira display
-          const day = String(date.getDate()).padStart(2, '0');
-          const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-          const mon = months[date.getMonth()];
-          const yr = String(date.getFullYear()).slice(-2);
-          return `${day}/${mon}/${yr}`;
-        }
-      }
-      // Fall back to text content, strip time portion
+      return stripTime(el.textContent);
+    },
+    // Fallback: #created-val text directly
+    () => {
+      const el = document.getElementById('created-val');
+      if (!el) return null;
       return stripTime(el.textContent);
     },
     // Fallback: Dates section label search
@@ -176,27 +191,13 @@ function extractCreatedDate() {
           const val = item.nextElementSibling || item.parentElement?.nextElementSibling;
           if (val) {
             const time = val.querySelector('time');
-            if (time) {
-              const dt = time.getAttribute('datetime');
-              if (dt) {
-                const date = new Date(dt);
-                if (!isNaN(date)) {
-                  const day = String(date.getDate()).padStart(2, '0');
-                  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                  const mon = months[date.getMonth()];
-                  const yr = String(date.getFullYear()).slice(-2);
-                  return `${day}/${mon}/${yr}`;
-                }
-              }
-              return stripTime(time.textContent);
-            }
-            return stripTime(val.textContent);
+            return stripTime(time ? time.textContent : val.textContent);
           }
         }
       }
       return null;
     },
-    () => findByLabel('Created')
+    () => stripTime(findByLabel('Created'))
   );
 }
 

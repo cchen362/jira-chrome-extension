@@ -61,41 +61,50 @@
     }
   ));
 
-  // 4. Description
+  // 4. Description — DO NOT use .closest('.module'), it grabs the entire Details section
   fields.push(test('Description',
     () => {
-      const toggles = document.querySelectorAll('.aui-toggle-header-button-label, .toggle-title');
-      for (const btn of toggles) {
-        if (btn.textContent.trim() === 'Description') {
-          const section = btn.closest('.module, .aui-toggle-header')?.parentElement;
-          if (section) {
-            const content = section.querySelector('.user-content-block, .mod-content, .field-ignore-highlight');
-            return content?.textContent;
+      const headings = document.querySelectorAll('h2, h3, .toggle-title, .aui-toggle-header-button-label');
+      for (const heading of headings) {
+        if (heading.textContent.trim() !== 'Description') continue;
+        const container = heading.closest('.toggle-wrap, .aui-toggle-header, [id*="description"]');
+        if (container) {
+          const content = container.querySelector('.user-content-block, .mod-content, .field-ignore-highlight');
+          if (content) return content.textContent;
+          const next = container.nextElementSibling;
+          if (next) {
+            const nested = next.querySelector('.user-content-block, .mod-content, .field-ignore-highlight');
+            if (nested) return nested.textContent;
+            return next.textContent;
           }
+        }
+        let sibling = heading.parentElement?.nextElementSibling;
+        if (sibling) {
+          const content = sibling.querySelector('.user-content-block, .mod-content, .field-ignore-highlight');
+          if (content) return content.textContent;
         }
       }
       return null;
     },
     () => document.querySelector('#description-val .user-content-block')?.textContent,
+    () => document.querySelector('#descriptionmodule .user-content-block')?.textContent,
     () => document.querySelector('#descriptionmodule .mod-content')?.textContent,
     () => document.getElementById('description-val')?.textContent
   ));
 
-  // 5. Created Date
+  // 5. Created Date — use visible text, NOT datetime attr (UTC causes timezone shift)
+  function stripTime(s) {
+    if (!s) return null;
+    return s.trim().replace(/\s+\d{1,2}:\d{2}\s*(AM|PM|am|pm)?.*$/i, '').trim() || s.trim();
+  }
   fields.push(test('Created Date',
     () => {
       const el = document.querySelector('#created-val time, #create-date time');
-      if (!el) return null;
-      const dt = el.getAttribute('datetime');
-      if (dt) {
-        const d = new Date(dt);
-        if (!isNaN(d)) {
-          const day = String(d.getDate()).padStart(2, '0');
-          const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-          return `${day}/${months[d.getMonth()]}/${String(d.getFullYear()).slice(-2)}`;
-        }
-      }
-      return el.textContent?.trim().replace(/\s+\d{1,2}:\d{2}\s*(AM|PM|am|pm)?.*$/, '');
+      return el ? stripTime(el.textContent) : null;
+    },
+    () => {
+      const el = document.getElementById('created-val');
+      return el ? stripTime(el.textContent) : null;
     },
     () => {
       const labels = document.querySelectorAll('strong, label, .wrap .name, dt');
@@ -103,7 +112,7 @@
         if (el.textContent.trim().replace(':', '') === 'Created') {
           const val = el.nextElementSibling || el.parentElement?.nextElementSibling;
           const time = val?.querySelector('time');
-          return time?.textContent?.trim().replace(/\s+\d{1,2}:\d{2}\s*(AM|PM|am|pm)?.*$/, '') || val?.textContent?.trim();
+          return stripTime(time ? time.textContent : val?.textContent);
         }
       }
       return null;
