@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jira Ticket Logger</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <div class="panel">
+    <!-- Header -->
+    <header class="panel-header">
+      <h1>Jira Ticket Logger</h1>
+      <div id="step-indicator" class="step-indicator">
+        <span class="step-dot active" data-step="form"></span>
+        <span class="step-dot" data-step="review"></span>
+        <span class="step-dot" data-step="success"></span>
+      </div>
+    </header>
+
+    <!-- Duplicate Warning Banner -->
+    <div id="duplicate-banner" class="banner banner-warning hidden">
+      <span class="banner-icon">&#9888;</span>
+      <span id="duplicate-message">This ticket was previously logged.</span>
+    </div>
+
+    <!-- Error Banner -->
+    <div id="error-banner" class="banner banner-error hidden">
+      <span id="error-message"></span>
+      <button id="error-retry-btn" class="btn btn-small">Retry</button>
+    </div>
+
+    <!-- Loading View -->
+    <div id="loading-view" class="view">
+      <div class="loading-container">
+        <div class="spinner"></div>
+        <p>Loading ticket data...</p>
+      </div>
+    </div>
+
+    <!-- Type Select View -->
+    <div id="type-select-view" class="view hidden">
+      <div class="type-select-container">
+        <h2>Select Ticket Type</h2>
+        <p>Could not auto-detect the ticket type from components. Please select:</p>
+        <div class="type-buttons">
+          <button id="type-product-btn" class="btn btn-type">Product</button>
+          <button id="type-salesforce-btn" class="btn btn-type">Salesforce</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Form View -->
+    <div id="form-view" class="view hidden">
+      <form id="ticket-form" novalidate>
+        <!-- Common Fields -->
+        <section class="form-section">
+          <h2>Ticket Details</h2>
+
+          <div class="form-group">
+            <label for="field-ticket-number">Jira Number</label>
+            <input type="text" id="field-ticket-number" readonly class="readonly">
+          </div>
+
+          <div class="form-group">
+            <label for="field-reporter">Reporter <span class="required">*</span></label>
+            <input type="text" id="field-reporter">
+            <span class="error-text hidden"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="field-assignee">Assignee <span class="required">*</span></label>
+            <input type="text" id="field-assignee">
+            <span class="error-text hidden"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="field-description">Description <span class="required">*</span></label>
+            <textarea id="field-description" rows="4"></textarea>
+            <span class="error-text hidden"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="field-created-date">Created Date <span class="required">*</span></label>
+            <input type="text" id="field-created-date">
+            <span class="error-text hidden"></span>
+          </div>
+        </section>
+
+        <!-- Product-Only Fields -->
+        <section id="product-fields" class="form-section hidden">
+          <h2>Priority Scoring</h2>
+
+          <div class="form-group">
+            <label for="field-overall-savings">Overall Savings <span class="required">*</span></label>
+            <select id="field-overall-savings">
+              <option value="">-- Select --</option>
+              <option value="<$50K">&lt;$50K</option>
+              <option value="$50-$100K">$50-$100K</option>
+              <option value=">$100K">&gt;$100K</option>
+            </select>
+            <span class="error-text hidden"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="field-impacted-area">Impacted Area <span class="required">*</span></label>
+            <select id="field-impacted-area">
+              <option value="">-- Select --</option>
+              <option value="POS">POS</option>
+              <option value="Single Region">Single Region</option>
+              <option value=">1 Region">&gt;1 Region</option>
+            </select>
+            <span class="error-text hidden"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="field-impacted-audience">Impacted Audience <span class="required">*</span></label>
+            <select id="field-impacted-audience">
+              <option value="">-- Select --</option>
+              <option value="Only Internal/Only Vendor">Only Internal/Only Vendor</option>
+              <option value="Internal and Vendor">Internal and Vendor</option>
+            </select>
+            <span class="error-text hidden"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="field-duration">Duration <span class="required">*</span></label>
+            <select id="field-duration">
+              <option value="">-- Select --</option>
+              <option value="0-1 Month">0-1 Month</option>
+              <option value="1-2 Months">1-2 Months</option>
+              <option value=">3 Months">&gt;3 Months</option>
+            </select>
+            <span class="error-text hidden"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="field-stakeholder">Stakeholder <span class="required">*</span></label>
+            <select id="field-stakeholder">
+              <option value="">-- Select --</option>
+              <option value="No Dependency">No Dependency</option>
+              <option value="Strong Engagement">Strong Engagement</option>
+              <option value="Need to Change">Need to Change</option>
+            </select>
+            <span class="error-text hidden"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="field-investment-time">Investment Time <span class="required">*</span></label>
+            <select id="field-investment-time">
+              <option value="">-- Select --</option>
+              <option value="<100 Hours">&lt;100 Hours</option>
+              <option value="100-200 Hours">100-200 Hours</option>
+              <option value=">200 Hours">&gt;200 Hours</option>
+            </select>
+            <span class="error-text hidden"></span>
+          </div>
+
+          <h2>Additional Details</h2>
+
+          <div class="form-group">
+            <label for="field-target-date">Target Complete Date</label>
+            <input type="text" id="field-target-date" placeholder="e.g., Q2 2026, March 2026, TBD">
+          </div>
+
+          <div class="form-group">
+            <label for="field-risk-items">Risk/Watch Items <span class="required">*</span></label>
+            <textarea id="field-risk-items" rows="3"></textarea>
+            <span class="error-text hidden"></span>
+          </div>
+        </section>
+
+        <!-- Salesforce-Only Fields -->
+        <section id="sf-fields" class="form-section hidden">
+          <h2>Salesforce Details</h2>
+
+          <div class="form-group">
+            <label for="field-region">Region</label>
+            <select id="field-region">
+              <option value="">-- Select --</option>
+              <option value="APAC">APAC</option>
+              <option value="EMEA">EMEA</option>
+              <option value="NA">NA</option>
+              <option value="Global">Global</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="field-status">Status <span class="required">*</span></label>
+            <select id="field-status">
+              <option value="">-- Select --</option>
+              <option value="New">New</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Hold">Hold</option>
+              <option value="Complete">Complete</option>
+              <option value="RTB Submitted">RTB Submitted</option>
+              <option value="RTB Completed">RTB Completed</option>
+            </select>
+            <span class="error-text hidden"></span>
+          </div>
+        </section>
+
+        <!-- Notes (both types) -->
+        <section class="form-section">
+          <div class="form-group">
+            <label for="field-notes">Notes</label>
+            <textarea id="field-notes" rows="3" placeholder="Optional notes..."></textarea>
+          </div>
+        </section>
+
+        <div class="form-actions">
+          <button type="button" id="review-btn" class="btn btn-primary">Review &amp; Submit</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Review View -->
+    <div id="review-view" class="view hidden">
+      <section class="form-section">
+        <h2>Review Submission</h2>
+
+        <!-- Rating Badge (Product only) -->
+        <div id="rating-container" class="rating-container hidden">
+          <span class="rating-label">Priority Rating:</span>
+          <span id="rating-badge" class="rating-badge"></span>
+        </div>
+
+        <!-- Scoring Breakdown (Product only) -->
+        <div id="scoring-breakdown" class="scoring-breakdown hidden">
+          <div class="score-row">
+            <span>ROI Score:</span>
+            <span id="review-roi-score"></span>
+            <span id="review-roi-level" class="level-badge"></span>
+          </div>
+          <div class="score-row">
+            <span>Effort Score:</span>
+            <span id="review-effort-score"></span>
+            <span id="review-effort-level" class="level-badge"></span>
+          </div>
+        </div>
+
+        <div id="review-fields" class="review-fields">
+          <!-- Populated dynamically by sidepanel.js -->
+        </div>
+      </section>
+
+      <div class="form-actions">
+        <button type="button" id="back-btn" class="btn btn-secondary">Go Back</button>
+        <button type="button" id="submit-btn" class="btn btn-primary">Submit</button>
+      </div>
+    </div>
+
+    <!-- Success View -->
+    <div id="success-view" class="view hidden">
+      <div class="success-container">
+        <div class="success-icon">&#10003;</div>
+        <h2 id="success-title">Ticket Logged!</h2>
+        <p id="success-message"></p>
+        <div class="form-actions">
+          <button type="button" id="log-another-btn" class="btn btn-secondary">Log Another</button>
+          <button type="button" id="close-panel-btn" class="btn btn-primary">Close Panel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts (order matters: dependencies first, controller last) -->
+  <script src="calculator.js"></script>
+  <script src="sharepoint.js"></script>
+  <script src="sidepanel.js"></script>
+</body>
+</html>
