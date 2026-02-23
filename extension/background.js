@@ -76,56 +76,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   // Proxy SharePoint fetch requests from the side panel.
+  // credentials:'include' sends the browser's cookies for domains in host_permissions.
+  // For POST requests, SharePoint's CSRF protection checks the Origin header —
+  // we must set it to the SP site URL so the request isn't rejected.
   if (message.type === 'SP_FETCH') {
     (async () => {
       try {
         const { url, options } = message;
-
-        // Diagnostic: check what cookies the browser has for SharePoint
-        const spCookies = await chrome.cookies.getAll({ url: 'https://gbtravel.sharepoint.com' });
-        console.log('[SP_FETCH]', options.method || 'GET', url);
-        console.log('[SP_FETCH] Browser cookies for SP:', spCookies.length,
-          '| Names:', spCookies.map(c => c.name).join(', '),
-          '| Domains:', [...new Set(spCookies.map(c => c.domain))].join(', '));
-
-        // Build cookie header from browser's cookie jar
-        const cookieStr = spCookies.map(c => `${c.name}=${c.value}`).join('; ');
+        const SP_ORIGIN = 'https://gbtravel.sharepoint.com';
 
         const fetchOptions = {
           method: options.method || 'GET',
+          credentials: 'include',
           headers: { ...options.headers }
         };
         if (options.body) {
           fetchOptions.body = options.body;
         }
 
-        // Strategy: use credentials:'omit' and manually attach cookies.
-        // In MV3 service workers, credentials:'include' uses the SW's own
-        // cookie jar (which is empty). The chrome.cookies API reads the
-        // BROWSER's cookies, which is what we need.
-        fetchOptions.credentials = 'omit';
-        if (cookieStr) {
-          fetchOptions.headers['Cookie'] = cookieStr;
+        // SharePoint rejects POSTs from unrecognized origins (CSRF protection).
+        // Set Origin + Referer to the SP site so the request appears first-party.
+        // Chrome extensions with host_permissions can set these headers.
+        if (fetchOptions.method !== 'GET') {
+          fetchOptions.headers['Origin'] = SP_ORIGIN;
+          fetchOptions.headers['Referer'] = SP_ORIGIN + '/';
         }
 
-        let response = await fetch(url, fetchOptions);
-        console.log('[SP_FETCH] Response (manual cookies):', response.status, response.statusText);
-
-        // If manual cookies didn't work (403/401), try credentials:'include'
-        // as fallback — in case this Chrome version DOES share the cookie jar
-        if (response.status === 401 || response.status === 403) {
-          console.log('[SP_FETCH] Manual cookies failed, trying credentials:include...');
-          const fallbackOptions = {
-            method: options.method || 'GET',
-            credentials: 'include',
-            headers: { ...options.headers }
-          };
-          if (options.body) {
-            fallbackOptions.body = options.body;
-          }
-          response = await fetch(url, fallbackOptions);
-          console.log('[SP_FETCH] Response (credentials:include):', response.status, response.statusText);
-        }
+        console.log('[SP_FETCH]', fetchOptions.method, url);
+        const response = await fetch(url, fetchOptions);
+        console.log('[SP_FETCH] Response:', response.status, response.statusText);
 
         // Read the response body
         let data = null;
