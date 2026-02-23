@@ -28,7 +28,7 @@
 
   // 1. Ticket Number
   fields.push(test('Ticket Number',
-    () => { const m = window.location.pathname.match(/\/browse\/([A-Z]+-\d+)/); return m ? m[1] : null; },
+    () => { const m = window.location.pathname.match(/(?:\/browse\/|\/queues\/custom\/\d+\/)([A-Z]+-\d+)/); return m ? m[1] : null; },
     () => document.getElementById('key-val')?.textContent,
     () => document.querySelector('[data-issue-key]')?.getAttribute('data-issue-key')
   ));

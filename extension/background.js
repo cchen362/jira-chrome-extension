@@ -4,7 +4,7 @@
 // 2. Handle extension icon click to open side panel
 // 3. Relay messages between side panel and content script
 
-const JIRA_TICKET_PATTERN = /^https:\/\/jira\.amexgbt\.com\/browse\/[A-Z]+-\d+/;
+const JIRA_TICKET_PATTERN = /^https:\/\/jira\.amexgbt\.com\/(browse|projects\/[A-Z]+\/queues\/custom\/\d+)\/[A-Z]+-\d+/;
 
 // --- Side Panel Control ---
 

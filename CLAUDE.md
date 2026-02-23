@@ -15,7 +15,7 @@ Chrome Extension (Manifest V3) with side panel UI. Auto-extracts Jira ticket dat
 
 ### Jira
 - **Base URL:** `https://jira.amexgbt.com`
-- **Match Pattern:** `https://jira.amexgbt.com/browse/*`
+- **Match Patterns:** `/browse/*` and `/projects/*/queues/*`
 - **Version:** Data Center v10.3.15
 - **Region Custom Field:** `customfield_17039`
 

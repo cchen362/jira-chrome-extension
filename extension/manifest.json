@@ -22,7 +22,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://jira.amexgbt.com/browse/*"],
+      "matches": ["https://jira.amexgbt.com/browse/*", "https://jira.amexgbt.com/projects/*/queues/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
     }

@@ -49,7 +49,7 @@ function extractTicketNumber() {
   return tryStrategies(
     // Primary: URL regex
     () => {
-      const match = window.location.pathname.match(/\/browse\/([A-Z]+-\d+)/);
+      const match = window.location.pathname.match(/(?:\/browse\/|\/queues\/custom\/\d+\/)([A-Z]+-\d+)/);
       return match ? match[1] : null;
     },
     // Fallback: DOM element
