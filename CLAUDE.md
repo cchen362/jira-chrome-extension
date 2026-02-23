@@ -75,13 +75,15 @@ extension/
 
 ## Phase Tracker
 - [x] Phase 0: Auth POC — validated session auth + cross-origin
-- [ ] Phase 1: Core MVP — IN PROGRESS
+- [x] Phase 1: Core MVP — COMPLETE (2026-02-23)
 - [ ] Phase 2: Hardening & Polish
 - [ ] Phase 3: Rollout
 
 ## Architecture Notes
 - **SharePoint calls MUST go through background.js** — side panel runs in chrome-extension:// origin and cannot send SharePoint session cookies. background.js has host_permissions and proxies all SP fetch calls via the `SP_FETCH` message type.
-- **Content script ↔ Side panel** communication is also relayed through background.js via `GET_JIRA_DATA` / `EXTRACT_JIRA_DATA` messages.
+- **Origin header rewrite via `declarativeNetRequest`** — SharePoint CSRF rejects POSTs from `chrome-extension://` origin. The `sp_header_rules.json` rule rewrites `Origin` and `Referer` to the SP domain on all XHR requests to `gbtravel.sharepoint.com`.
+- **Content script ↔ Side panel** communication is relayed through background.js via `GET_JIRA_DATA` / `EXTRACT_JIRA_DATA` messages.
+- **Jira URL support:** Both `/browse/TICKET-123` and `/projects/*/queues/custom/NNN/TICKET-123` patterns are supported across manifest, background.js, and content.js.
 
 ## Lessons Learned
 <!-- Update this section as we discover things during development -->

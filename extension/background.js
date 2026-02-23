@@ -93,9 +93,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           fetchOptions.body = options.body;
         }
 
-        console.log('[SP_FETCH]', fetchOptions.method, url);
         const response = await fetch(url, fetchOptions);
-        console.log('[SP_FETCH] Response:', response.status, response.statusText);
 
         // Read the response body
         let data = null;
