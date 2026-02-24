@@ -300,38 +300,104 @@ ul.category-desc li:last-child {
 /* === Form === */
 .form-section {
   background: #fff;
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 12px;
-  border: 1px solid #EBECF0;
-  box-shadow: 0 1px 3px rgba(9, 30, 66, 0.06);
+  border-radius: 10px;
+  padding: 0 16px 18px;
+  margin-bottom: 16px;
+  border: 1px solid #DFE1E6;
+  box-shadow: 0 1px 4px rgba(9, 30, 66, 0.08),
+              0 0 1px rgba(9, 30, 66, 0.04);
 }
 
 .form-section h2 {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #5E6C84;
-  margin-bottom: 14px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #EBECF0;
+  color: #0747A6;
+  background: #DEEBFF;
+  margin: 0 -16px 18px;
+  padding: 11px 16px;
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
   position: relative;
 }
 
 .form-section h2::after {
   content: '';
   position: absolute;
-  bottom: -1px;
+  bottom: 0;
   left: 0;
-  width: 40px;
-  height: 2px;
-  background: #0052CC;
-  border-radius: 1px;
+  right: 0;
+  width: auto;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 0;
+}
+
+/* --- Section-Specific Colors (Left Border + Header) --- */
+
+/* Ticket Details — Blue */
+.form-section--details {
+  border-left: 3px solid #0052CC;
+}
+.form-section--details h2 {
+  background: #DEEBFF;
+  color: #0747A6;
+}
+
+/* Priority Scoring / Product — Purple */
+.form-section--scoring {
+  border-left: 3px solid #6554C0;
+}
+.form-section--scoring h2 {
+  background: #EAE6FF;
+  color: #403294;
+}
+
+/* Notes — Green */
+.form-section--notes {
+  border-left: 3px solid #36B37E;
+}
+.form-section--notes h2 {
+  background: #E3FCEF;
+  color: #006644;
+}
+
+/* Review — Blue */
+#review-view .form-section {
+  border-left: 3px solid #0052CC;
+}
+#review-view .form-section h2 {
+  background: #DEEBFF;
+  color: #0747A6;
+}
+
+/* --- Additional Details Sub-Header (inside Product section) --- */
+
+/* When scoring is visible: internal sub-header style */
+#scoring-fields:not(.hidden) ~ h2 {
+  margin: 24px 0 18px;
+  padding: 10px 12px;
+  background: #F7F8FA;
+  border-radius: 6px;
+  color: #505F79;
+}
+
+#scoring-fields:not(.hidden) ~ h2::after {
+  display: none;
+}
+
+/* When scoring is hidden (auto-accepted): primary section header style */
+#scoring-fields.hidden ~ h2 {
+  margin: 0 -16px 18px;
+  padding: 11px 16px;
+  background: #EAE6FF;
+  color: #403294;
+  border-radius: 10px 10px 0 0;
 }
 
 .form-group {
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .form-group:last-child {
@@ -342,8 +408,8 @@ ul.category-desc li:last-child {
   display: block;
   font-size: 12px;
   font-weight: 600;
-  color: #172B4D;
-  margin-bottom: 5px;
+  color: #505F79;
+  margin-bottom: 6px;
 }
 
 .required {

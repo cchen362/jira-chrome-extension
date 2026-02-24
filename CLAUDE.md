@@ -29,7 +29,7 @@ Description        Note       — plain text
 Reporter           Text
 Assignee           Text
 CreatedDate        Text       — date string only (e.g., "24/Nov/25")
-Region             Choice     — APAC, EMEA, NA, Global, EMEA and APAC
+Region             Choice     — APAC, EMEA, NA, Global, EMEA and APAC (both types, auto-extracted from Jira)
 TicketStatus       Choice     — New Request, In Progress, On Hold, Pending Review, RTB Submitted, RTB Completed, Closed (both types)
 OverallSavings     Choice     — <$50K, $50-$100K, >$100K
 ImpactedArea       Choice     — POS, Single Region, >1 Region
@@ -74,6 +74,28 @@ extension/
     calculator.js
 ```
 
+
+<aesthetics>
+You tend to converge toward generic, "on distribution" outputs. In frontend design, this creates what users call the "AI slop" aesthetic. Avoid this: make creative, distinctive frontends that surprise and delight. Focus on:
+ 
+Typography: Choose fonts that are beautiful, unique, and interesting. Avoid generic fonts like Arial and Inter; opt instead for distinctive choices that elevate the frontend's aesthetics.
+ 
+Color & Theme: Commit to a cohesive aesthetic. Use CSS variables for consistency. Dominant colors with sharp accents outperform timid, evenly-distributed palettes. Draw from IDE themes and cultural aesthetics for inspiration.
+ 
+Motion: Use animations for effects and micro-interactions. Prioritize CSS-only solutions for HTML. Use Motion library for React when available. Focus on high-impact moments: one well-orchestrated page load with staggered reveals (animation-delay) creates more delight than scattered micro-interactions.
+ 
+Backgrounds: Create atmosphere and depth rather than defaulting to solid colors. Layer CSS gradients, use geometric patterns, or add contextual effects that match the overall aesthetic.
+ 
+Avoid generic AI-generated aesthetics:
+- Overused font families (Inter, Roboto, Arial, system fonts)
+- Clichéd color schemes (particularly purple gradients on white backgrounds)
+- Predictable layouts and component patterns
+- Cookie-cutter design that lacks context-specific character
+ 
+Interpret creatively and make unexpected choices that feel genuinely designed for the context. Vary between light and dark themes, different fonts, different aesthetics. You still tend to converge on common choices (Space Grotesk, for example) across generations. Avoid this: it is critical that you think outside the box!
+</aesthetics>
+
+
 ## Phase Tracker
 - [x] Phase 0: Auth POC — validated session auth + cross-origin
 - [x] Phase 1: Core MVP — COMPLETE (2026-02-23)
@@ -87,6 +109,8 @@ extension/
 - **Jira URL support:** Both `/browse/TICKET-123` and `/projects/*/queues/custom/NNN/TICKET-123` patterns are supported across manifest, background.js, and content.js.
 - **Status auto-extracted from Jira** opsbar for both ticket types; editable dropdown with case-insensitive matching.
 - **Product sub-category branching** — Product Roadmap and Quick Wins/Impact to TCE are auto-accepted (no scoring fields, rating = "Accepted"); Others gets full scoring form. Category stored in `ProductCategory` SP column.
+- **Region is common to both ticket types** — auto-extracted from Jira `customfield_17039`, editable dropdown. SF-only section removed; Region now lives in the common "Ticket Details" section.
+- **UI design: Option C (Bold but Tasteful)** — Section cards have colored header bars (blue for Details, purple for Scoring, green for Notes) and left-border accents. Atlassian Design System color tokens (B50/B800, P50/P800, G50/G800). "Additional Details" sub-header inside Product section uses gray pill style when scoring is visible, or inherits purple section header when scoring is hidden.
 
 ## Lessons Learned
 <!-- Update this section as we discover things during development -->

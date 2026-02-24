@@ -209,13 +209,14 @@
     // Auto-fill status from Jira (for both ticket types)
     setSelectValue('status', data.status || '');
 
+    // Auto-fill region from Jira (for both ticket types)
+    setSelectValue('region', data.region || '');
+
     // Show/hide type-specific sections
     const productSection = document.getElementById('product-fields');
-    const sfSection = document.getElementById('sf-fields');
 
     if (state.ticketType === 'product') {
       productSection.classList.remove('hidden');
-      sfSection.classList.add('hidden');
 
       // Show/hide scoring fields based on product category
       const scoringSection = document.getElementById('scoring-fields');
@@ -230,11 +231,14 @@
       }
     } else {
       productSection.classList.add('hidden');
-      sfSection.classList.remove('hidden');
+    }
 
-      // Pre-fill region from Jira data
-      const region = data.region || '';
-      setSelectValue('region', region);
+    // Show Go Back button only for Product tickets (returns to category selector)
+    const formBackBtn = document.getElementById('form-back-btn');
+    if (state.ticketType === 'product') {
+      formBackBtn.classList.remove('hidden');
+    } else {
+      formBackBtn.classList.add('hidden');
     }
 
     // If editing, overlay saved analyst-entered fields
@@ -248,8 +252,10 @@
         setSelectValue('investmentTime', existing.InvestmentTime);
         getField('targetDate').value = existing.TargetCompleteDate || '';
         getField('riskItems').value = existing.RiskWatchItems || '';
-      } else {
-        setSelectValue('region', existing.Region || data.region || '');
+      }
+      // Region applies to both types — saved value overrides auto-extracted
+      if (existing.Region) {
+        setSelectValue('region', existing.Region);
       }
       // Status applies to both types — saved value overrides auto-extracted
       if (existing.TicketStatus) {
@@ -370,7 +376,8 @@
       ['Assignee', getField('assignee').value],
       ['Description', getField('description').value],
       ['Created Date', getField('createdDate').value],
-      ['Status', getField('status').value]
+      ['Status', getField('status').value],
+      ['Region', getField('region').value || '(not set)']
     ];
 
     if (state.ticketType === 'product') {
@@ -422,10 +429,6 @@
       // Hide rating for Salesforce
       document.getElementById('rating-container').classList.add('hidden');
       document.getElementById('scoring-breakdown').classList.add('hidden');
-
-      rows.push(
-        ['Region', getField('region').value || '(not set)']
-      );
     }
 
     // Notes (both types)
@@ -494,7 +497,8 @@
       CreatedDate: getField('createdDate').value.trim(),
       SubmittedBy: getField('assignee').value.trim(),
       Notes: getField('notes').value.trim() || null,
-      TicketStatus: getField('status').value
+      TicketStatus: getField('status').value,
+      Region: getField('region').value || null
     };
 
     if (state.ticketType === 'product') {
@@ -524,8 +528,6 @@
         });
         data.CalculatedRating = result.rating;
       }
-    } else {
-      data.Region = getField('region').value || null;
     }
 
     return data;
@@ -579,6 +581,12 @@
     if (!card) return;
     state.productCategory = card.dataset.category;
     showForm();
+  });
+
+  // Form Go Back button (returns to product category selector)
+  document.getElementById('form-back-btn').addEventListener('click', () => {
+    state.productCategory = null;
+    showProductCategorySelector();
   });
 
   // Review & Submit button

@@ -92,7 +92,7 @@
     <div id="form-view" class="view hidden">
       <form id="ticket-form" novalidate>
         <!-- Common Fields -->
-        <section class="form-section">
+        <section class="form-section form-section--details">
           <h2>Ticket Details</h2>
 
           <div class="form-group">
@@ -138,10 +138,22 @@
             </select>
             <span class="error-text hidden"></span>
           </div>
+
+          <div class="form-group">
+            <label for="field-region">Region</label>
+            <select id="field-region">
+              <option value="">-- Select --</option>
+              <option value="APAC">APAC</option>
+              <option value="EMEA">EMEA</option>
+              <option value="NA">NA</option>
+              <option value="Global">Global</option>
+              <option value="EMEA and APAC">EMEA and APAC</option>
+            </select>
+          </div>
         </section>
 
         <!-- Product-Only Fields -->
-        <section id="product-fields" class="form-section hidden">
+        <section id="product-fields" class="form-section form-section--scoring hidden">
           <div id="scoring-fields">
           <h2>Priority Scoring</h2>
 
@@ -225,26 +237,9 @@
           </div>
         </section>
 
-        <!-- Salesforce-Only Fields -->
-        <section id="sf-fields" class="form-section hidden">
-          <h2>Salesforce Details</h2>
-
-          <div class="form-group">
-            <label for="field-region">Region</label>
-            <select id="field-region">
-              <option value="">-- Select --</option>
-              <option value="APAC">APAC</option>
-              <option value="EMEA">EMEA</option>
-              <option value="NA">NA</option>
-              <option value="Global">Global</option>
-              <option value="EMEA and APAC">EMEA and APAC</option>
-            </select>
-          </div>
-
-        </section>
-
         <!-- Notes (both types) -->
-        <section class="form-section">
+        <section class="form-section form-section--notes">
+          <h2>Additional</h2>
           <div class="form-group">
             <label for="field-notes">Notes</label>
             <textarea id="field-notes" rows="3" placeholder="Optional notes..."></textarea>
@@ -252,6 +247,7 @@
         </section>
 
         <div class="form-actions">
+          <button type="button" id="form-back-btn" class="btn btn-secondary hidden">Go Back</button>
           <button type="button" id="review-btn" class="btn btn-primary">Review &amp; Submit</button>
         </div>
       </form>
