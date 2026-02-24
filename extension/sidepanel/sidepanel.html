@@ -50,6 +50,44 @@
       </div>
     </div>
 
+    <!-- Product Category Select View -->
+    <div id="product-category-view" class="view hidden">
+      <div class="category-select-container">
+        <h2>Select Product Category</h2>
+        <p>Choose the category that best fits this ticket:</p>
+        <div class="category-options">
+
+          <button type="button" class="category-card" data-category="Product Roadmap">
+            <div class="category-header">
+              <span class="category-title">Product Roadmap</span>
+              <span class="category-tag">Auto-accepted</span>
+            </div>
+            <p class="category-desc">Jiras which Product raise and we need to start working on.</p>
+          </button>
+
+          <button type="button" class="category-card" data-category="Quick Wins/Impact to TCE">
+            <div class="category-header">
+              <span class="category-title">Quick Wins / Impact to TCE</span>
+              <span class="category-tag">Auto-accepted</span>
+            </div>
+            <ul class="category-desc">
+              <li>General questions that can be answered within 1&#8211;2 messages</li>
+              <li>Not valid Jiras, e.g. needs to be redirected to correct team such as EGTS etc.</li>
+              <li>Topics which will stop work for TCE and need urgent attention, e.g. changes with a supplier</li>
+            </ul>
+          </button>
+
+          <button type="button" class="category-card" data-category="Others">
+            <div class="category-header">
+              <span class="category-title">Others</span>
+            </div>
+            <p class="category-desc">For all other Jiras which need to be given a rating.</p>
+          </button>
+
+        </div>
+      </div>
+    </div>
+
     <!-- Form View -->
     <div id="form-view" class="view hidden">
       <form id="ticket-form" novalidate>
@@ -85,10 +123,26 @@
             <input type="text" id="field-created-date">
             <span class="error-text hidden"></span>
           </div>
+
+          <div class="form-group">
+            <label for="field-status">Status <span class="required">*</span></label>
+            <select id="field-status">
+              <option value="">-- Select --</option>
+              <option value="New Request">New Request</option>
+              <option value="In Progress">In Progress</option>
+              <option value="On Hold">On Hold</option>
+              <option value="Pending Review">Pending Review</option>
+              <option value="RTB Submitted">RTB Submitted</option>
+              <option value="RTB Completed">RTB Completed</option>
+              <option value="Closed">Closed</option>
+            </select>
+            <span class="error-text hidden"></span>
+          </div>
         </section>
 
         <!-- Product-Only Fields -->
         <section id="product-fields" class="form-section hidden">
+          <div id="scoring-fields">
           <h2>Priority Scoring</h2>
 
           <div class="form-group">
@@ -139,8 +193,8 @@
             <select id="field-stakeholder">
               <option value="">-- Select --</option>
               <option value="No Dependency">No Dependency</option>
-              <option value="Strong Engagement">Strong Engagement</option>
-              <option value="Need to Change">Need to Change</option>
+              <option value="Needs Engagement">Needs Engagement</option>
+              <option value="Need to Change Roadmap">Need to Change Roadmap</option>
             </select>
             <span class="error-text hidden"></span>
           </div>
@@ -154,6 +208,7 @@
               <option value=">200 Hours">&gt;200 Hours</option>
             </select>
             <span class="error-text hidden"></span>
+          </div>
           </div>
 
           <h2>Additional Details</h2>
@@ -186,19 +241,6 @@
             </select>
           </div>
 
-          <div class="form-group">
-            <label for="field-status">Status <span class="required">*</span></label>
-            <select id="field-status">
-              <option value="">-- Select --</option>
-              <option value="New">New</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Hold">Hold</option>
-              <option value="Complete">Complete</option>
-              <option value="RTB Submitted">RTB Submitted</option>
-              <option value="RTB Completed">RTB Completed</option>
-            </select>
-            <span class="error-text hidden"></span>
-          </div>
         </section>
 
         <!-- Notes (both types) -->

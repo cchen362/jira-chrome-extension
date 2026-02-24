@@ -30,17 +30,18 @@ Reporter           Text
 Assignee           Text
 CreatedDate        Text       — date string only (e.g., "24/Nov/25")
 Region             Choice     — APAC, EMEA, NA, Global, EMEA and APAC
-TicketStatus       Choice     — New, In Progress, Hold, Complete, RTB Submitted, RTB Completed
+TicketStatus       Choice     — New Request, In Progress, On Hold, Pending Review, RTB Submitted, RTB Completed, Closed (both types)
 OverallSavings     Choice     — <$50K, $50-$100K, >$100K
 ImpactedArea       Choice     — POS, Single Region, >1 Region
 ImpactedAudience   Choice     — Only Internal/Only Vendor, Internal and Vendor
 Duration           Choice     — 0-1 Month, 1-2 Months, >3 Months
-Stakeholder        Choice     — No Dependency, Strong Engagement, Need to Change
+Stakeholder        Choice     — No Dependency, Needs Engagement, Need to Change Roadmap
 InvestmentTime     Choice     — <100 Hours, 100-200 Hours, >200 Hours
 TargetCompleteDate Text       — free text
 RiskWatchItems     Note       — plain text
 CalculatedRating   Choice     — Accepted, Up Next, Maybe, Likely No, Rejected
 Notes              Note       — plain text
+ProductCategory    Choice     — Product Roadmap, Quick Wins/Impact to TCE, Others (Product only)
 SubmittedBy        Text       — = Assignee value
 ```
 
@@ -84,6 +85,8 @@ extension/
 - **Origin header rewrite via `declarativeNetRequest`** — SharePoint CSRF rejects POSTs from `chrome-extension://` origin. The `sp_header_rules.json` rule rewrites `Origin` and `Referer` to the SP domain on all XHR requests to `gbtravel.sharepoint.com`.
 - **Content script ↔ Side panel** communication is relayed through background.js via `GET_JIRA_DATA` / `EXTRACT_JIRA_DATA` messages.
 - **Jira URL support:** Both `/browse/TICKET-123` and `/projects/*/queues/custom/NNN/TICKET-123` patterns are supported across manifest, background.js, and content.js.
+- **Status auto-extracted from Jira** opsbar for both ticket types; editable dropdown with case-insensitive matching.
+- **Product sub-category branching** — Product Roadmap and Quick Wins/Impact to TCE are auto-accepted (no scoring fields, rating = "Accepted"); Others gets full scoring form. Category stored in `ProductCategory` SP column.
 
 ## Lessons Learned
 <!-- Update this section as we discover things during development -->
@@ -99,3 +102,5 @@ extension/
 - Created Date: Use a HYBRID approach — (1) try visible text first (avoids UTC timezone shift on absolute dates like "24/Nov/25"), (2) if visible text is a relative date ("3 days ago", "yesterday"), fall back to `datetime` attribute but parse date components directly (regex `^(\d{4})-(\d{2})-(\d{2})`) — NEVER use `new Date()` on the ISO string as it converts to local timezone and can shift the date
 - Phase 2: SharePoint retry uses `withRetry(fn, 2)` wrapper — only retries on transient errors (network, 500, 503, 429), NOT on auth (401/403) or conflict (412). On 403 during POST, invalidate digest cache so next retry gets a fresh one.
 - Phase 2: Region dropdown has 5 options: APAC, EMEA, NA, Global, EMEA and APAC (added 2026-02-24)
+- Jira status selector: `[class*="opsbar-transitions__status-category"] .dropdown-text` (with fallbacks to `#status-val` and `findByLabel`)
+- Product sub-category stored in `ProductCategory` SP column; auto-accepted categories skip scoring entirely

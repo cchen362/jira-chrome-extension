@@ -5,16 +5,24 @@
 (() => {
   // --- State ---
   const state = {
-    ticketType: null,   // 'product' or 'salesforce'
-    jiraData: null,     // raw extracted data from content script
-    existingItem: null, // SharePoint item if duplicate { id, etag, item }
-    isUpdate: false     // true if editing a previously logged ticket
+    ticketType: null,        // 'product' or 'salesforce'
+    productCategory: null,   // 'Product Roadmap' | 'Quick Wins/Impact to TCE' | 'Others' | null
+    jiraData: null,          // raw extracted data from content script
+    existingItem: null,      // SharePoint item if duplicate { id, etag, item }
+    isUpdate: false          // true if editing a previously logged ticket
   };
+
+  const AUTO_ACCEPTED_CATEGORIES = ['Product Roadmap', 'Quick Wins/Impact to TCE'];
+
+  function isAutoAccepted() {
+    return AUTO_ACCEPTED_CATEGORIES.includes(state.productCategory);
+  }
 
   // --- DOM References ---
   const views = {
     loading: document.getElementById('loading-view'),
     typeSelect: document.getElementById('type-select-view'),
+    productCategory: document.getElementById('product-category-view'),
     form: document.getElementById('form-view'),
     review: document.getElementById('review-view'),
     success: document.getElementById('success-view')
@@ -110,6 +118,7 @@
     hideError();
     banners.duplicate.classList.add('hidden');
     state.ticketType = null;
+    state.productCategory = null;
     state.jiraData = null;
     state.existingItem = null;
     state.isUpdate = false;
@@ -146,6 +155,9 @@
       if (spResult.exists) {
         state.existingItem = spResult;
         state.isUpdate = true;
+        if (spResult.item.ProductCategory) {
+          state.productCategory = spResult.item.ProductCategory;
+        }
         showDuplicateBanner(spResult.item);
       }
 
@@ -154,7 +166,11 @@
 
       if (components.length === 1 && components[0] === 'product') {
         state.ticketType = 'product';
-        showForm();
+        if (state.productCategory) {
+          showForm();  // Re-edit: category already known, skip dialog
+        } else {
+          showProductCategorySelector();
+        }
       } else if (components.length === 1 && components[0] === 'salesforce') {
         state.ticketType = 'salesforce';
         showForm();
@@ -175,6 +191,10 @@
     showView('form');
   }
 
+  function showProductCategorySelector() {
+    showView('productCategory');
+  }
+
   function populateForm() {
     const data = state.jiraData || {};
     const existing = state.existingItem?.item;
@@ -186,6 +206,9 @@
     getField('description').value = data.description || '';
     getField('createdDate').value = data.createdDate || '';
 
+    // Auto-fill status from Jira (for both ticket types)
+    setSelectValue('status', data.status || '');
+
     // Show/hide type-specific sections
     const productSection = document.getElementById('product-fields');
     const sfSection = document.getElementById('sf-fields');
@@ -193,6 +216,18 @@
     if (state.ticketType === 'product') {
       productSection.classList.remove('hidden');
       sfSection.classList.add('hidden');
+
+      // Show/hide scoring fields based on product category
+      const scoringSection = document.getElementById('scoring-fields');
+      if (isAutoAccepted()) {
+        scoringSection.classList.add('hidden');
+        // Clear any stale scoring values
+        ['overallSavings', 'impactedArea', 'impactedAudience', 'duration', 'stakeholder', 'investmentTime'].forEach(f => {
+          getField(f).value = '';
+        });
+      } else {
+        scoringSection.classList.remove('hidden');
+      }
     } else {
       productSection.classList.add('hidden');
       sfSection.classList.remove('hidden');
@@ -215,6 +250,9 @@
         getField('riskItems').value = existing.RiskWatchItems || '';
       } else {
         setSelectValue('region', existing.Region || data.region || '');
+      }
+      // Status applies to both types — saved value overrides auto-extracted
+      if (existing.TicketStatus) {
         setSelectValue('status', existing.TicketStatus);
       }
       getField('notes').value = existing.Notes || '';
@@ -261,24 +299,26 @@
       }
     }
 
+    // Status required for both ticket types
+    if (!getField('status').value) {
+      showFieldError('status', 'Please select a status.');
+      valid = false;
+    }
+
     if (state.ticketType === 'product') {
-      // All 6 scoring dropdowns required
-      const scoringFields = ['overallSavings', 'impactedArea', 'impactedAudience', 'duration', 'stakeholder', 'investmentTime'];
-      for (const name of scoringFields) {
-        if (!getField(name).value) {
-          showFieldError(name, `Please select ${FIELD_LABELS[name].toLowerCase()}.`);
-          valid = false;
+      // Scoring fields only required for "Others" category
+      if (!isAutoAccepted()) {
+        const scoringFields = ['overallSavings', 'impactedArea', 'impactedAudience', 'duration', 'stakeholder', 'investmentTime'];
+        for (const name of scoringFields) {
+          if (!getField(name).value) {
+            showFieldError(name, `Please select ${FIELD_LABELS[name].toLowerCase()}.`);
+            valid = false;
+          }
         }
       }
-      // Risk/Watch Items required
+      // Risk/Watch Items required for ALL product categories
       if (!getField('riskItems').value.trim()) {
         showFieldError('riskItems', `${FIELD_LABELS['riskItems']} is required.`);
-        valid = false;
-      }
-    } else {
-      // Salesforce: Status required
-      if (!getField('status').value) {
-        showFieldError('status', 'Please select a status.');
         valid = false;
       }
     }
@@ -329,42 +369,52 @@
       ['Reporter', getField('reporter').value],
       ['Assignee', getField('assignee').value],
       ['Description', getField('description').value],
-      ['Created Date', getField('createdDate').value]
+      ['Created Date', getField('createdDate').value],
+      ['Status', getField('status').value]
     ];
 
     if (state.ticketType === 'product') {
-      // Calculate rating
-      const ratingResult = Calculator.calculateRating({
-        overallSavings: getField('overallSavings').value,
-        impactedArea: getField('impactedArea').value,
-        impactedAudience: getField('impactedAudience').value,
-        duration: getField('duration').value,
-        stakeholder: getField('stakeholder').value,
-        investmentTime: getField('investmentTime').value
-      });
-
-      // Show rating badge
       const ratingContainer = document.getElementById('rating-container');
       const ratingBadge = document.getElementById('rating-badge');
-      ratingContainer.classList.remove('hidden');
-      ratingBadge.textContent = ratingResult.rating;
-      ratingBadge.className = 'rating-badge rating-' + ratingResult.rating.toLowerCase().replace(/\s+/g, '-');
-
-      // Show scoring breakdown
       const breakdown = document.getElementById('scoring-breakdown');
-      breakdown.classList.remove('hidden');
-      document.getElementById('review-roi-score').textContent = ratingResult.roiScore;
-      document.getElementById('review-roi-level').textContent = ratingResult.roiLevel;
-      document.getElementById('review-effort-score').textContent = ratingResult.effortScore;
-      document.getElementById('review-effort-level').textContent = ratingResult.effortLevel;
+      ratingContainer.classList.remove('hidden');
 
+      if (isAutoAccepted()) {
+        // Auto-accepted: just show "Accepted" badge, no scoring breakdown
+        ratingBadge.textContent = 'Accepted';
+        ratingBadge.className = 'rating-badge rating-accepted';
+        breakdown.classList.add('hidden');
+      } else {
+        // "Others": full calculation
+        const ratingResult = Calculator.calculateRating({
+          overallSavings: getField('overallSavings').value,
+          impactedArea: getField('impactedArea').value,
+          impactedAudience: getField('impactedAudience').value,
+          duration: getField('duration').value,
+          stakeholder: getField('stakeholder').value,
+          investmentTime: getField('investmentTime').value
+        });
+        ratingBadge.textContent = ratingResult.rating;
+        ratingBadge.className = 'rating-badge rating-' + ratingResult.rating.toLowerCase().replace(/\s+/g, '-');
+        breakdown.classList.remove('hidden');
+        document.getElementById('review-roi-score').textContent = ratingResult.roiScore;
+        document.getElementById('review-roi-level').textContent = ratingResult.roiLevel;
+        document.getElementById('review-effort-score').textContent = ratingResult.effortScore;
+        document.getElementById('review-effort-level').textContent = ratingResult.effortLevel;
+
+        rows.push(
+          ['Overall Savings', getField('overallSavings').value],
+          ['Impacted Area', getField('impactedArea').value],
+          ['Impacted Audience', getField('impactedAudience').value],
+          ['Duration', getField('duration').value],
+          ['Stakeholder', getField('stakeholder').value],
+          ['Investment Time', getField('investmentTime').value]
+        );
+      }
+
+      // Always show for product tickets
       rows.push(
-        ['Overall Savings', getField('overallSavings').value],
-        ['Impacted Area', getField('impactedArea').value],
-        ['Impacted Audience', getField('impactedAudience').value],
-        ['Duration', getField('duration').value],
-        ['Stakeholder', getField('stakeholder').value],
-        ['Investment Time', getField('investmentTime').value],
+        ['Product Category', state.productCategory],
         ['Target Complete Date', getField('targetDate').value || '(not set)'],
         ['Risk/Watch Items', getField('riskItems').value]
       );
@@ -374,8 +424,7 @@
       document.getElementById('scoring-breakdown').classList.add('hidden');
 
       rows.push(
-        ['Region', getField('region').value || '(not set)'],
-        ['Status', getField('status').value]
+        ['Region', getField('region').value || '(not set)']
       );
     }
 
@@ -444,32 +493,39 @@
       Assignee: getField('assignee').value.trim(),
       CreatedDate: getField('createdDate').value.trim(),
       SubmittedBy: getField('assignee').value.trim(),
-      Notes: getField('notes').value.trim() || null
+      Notes: getField('notes').value.trim() || null,
+      TicketStatus: getField('status').value
     };
 
     if (state.ticketType === 'product') {
-      data.OverallSavings = getField('overallSavings').value;
-      data.ImpactedArea = getField('impactedArea').value;
-      data.ImpactedAudience = getField('impactedAudience').value;
-      data.Duration = getField('duration').value;
-      data.Stakeholder = getField('stakeholder').value;
-      data.InvestmentTime = getField('investmentTime').value;
+      data.ProductCategory = state.productCategory;
       data.TargetCompleteDate = getField('targetDate').value.trim() || null;
       data.RiskWatchItems = getField('riskItems').value.trim();
 
-      // Calculate and store the rating
-      const result = Calculator.calculateRating({
-        overallSavings: data.OverallSavings,
-        impactedArea: data.ImpactedArea,
-        impactedAudience: data.ImpactedAudience,
-        duration: data.Duration,
-        stakeholder: data.Stakeholder,
-        investmentTime: data.InvestmentTime
-      });
-      data.CalculatedRating = result.rating;
+      if (isAutoAccepted()) {
+        // Auto-accepted: hardcode rating, no scoring fields
+        data.CalculatedRating = 'Accepted';
+      } else {
+        // "Others": full scoring + calculation
+        data.OverallSavings = getField('overallSavings').value;
+        data.ImpactedArea = getField('impactedArea').value;
+        data.ImpactedAudience = getField('impactedAudience').value;
+        data.Duration = getField('duration').value;
+        data.Stakeholder = getField('stakeholder').value;
+        data.InvestmentTime = getField('investmentTime').value;
+
+        const result = Calculator.calculateRating({
+          overallSavings: data.OverallSavings,
+          impactedArea: data.ImpactedArea,
+          impactedAudience: data.ImpactedAudience,
+          duration: data.Duration,
+          stakeholder: data.Stakeholder,
+          investmentTime: data.InvestmentTime
+        });
+        data.CalculatedRating = result.rating;
+      }
     } else {
       data.Region = getField('region').value || null;
-      data.TicketStatus = getField('status').value;
     }
 
     return data;
@@ -509,11 +565,19 @@
   // Type selection buttons
   document.getElementById('type-product-btn').addEventListener('click', () => {
     state.ticketType = 'product';
-    showForm();
+    showProductCategorySelector();
   });
 
   document.getElementById('type-salesforce-btn').addEventListener('click', () => {
     state.ticketType = 'salesforce';
+    showForm();
+  });
+
+  // Product category selection (delegated)
+  document.getElementById('product-category-view').addEventListener('click', (e) => {
+    const card = e.target.closest('.category-card');
+    if (!card) return;
+    state.productCategory = card.dataset.category;
     showForm();
   });
 

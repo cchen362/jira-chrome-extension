@@ -301,6 +301,23 @@ function extractRegion() {
   );
 }
 
+function extractStatus() {
+  return tryStrategies(
+    // Primary: Jira DC opsbar status button — contains a <span class="dropdown-text">
+    () => {
+      const el = document.querySelector('[class*="opsbar-transitions__status-category"] .dropdown-text');
+      return el ? el.textContent : null;
+    },
+    // Fallback: #status-val element (older Jira layouts)
+    () => {
+      const el = document.getElementById('status-val');
+      return el ? el.textContent : null;
+    },
+    // Fallback: label-based search
+    () => findByLabel('Status')
+  );
+}
+
 // --- Main Extraction ---
 
 function extractAll() {
@@ -311,7 +328,8 @@ function extractAll() {
     description: extractDescription(),
     createdDate: extractCreatedDate(),
     components: extractComponents(),
-    region: extractRegion()
+    region: extractRegion(),
+    status: extractStatus()
   };
 }
 

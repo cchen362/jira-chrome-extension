@@ -21,8 +21,8 @@ const Calculator = (() => {
     '>3 Months': 10,
     // Stakeholder (Effort component)
     'No Dependency': 0,
-    'Strong Engagement': 5,
-    'Need to Change': 10,
+    'Needs Engagement': 5,
+    'Need to Change Roadmap': 10,
     // Investment Time (Effort component)
     '<100 Hours': 0,
     '100-200 Hours': 5,
